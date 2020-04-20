@@ -1,3 +1,32 @@
+local imgui_current_dir = "imgui"
+local imgui_min_version_dir = "extern/imgui-1.64"
+local project_location = ""
+local sdl_dir = "extern/SDL-2.0.12"
+
+function imgui_project(name, imgui_location)
+    project(name)
+    location(project_location)
+    kind "StaticLib"
+    language "C++"
+    cppdialect "C++98"
+    targetdir "lib/%{cfg.buildcfg}"
+    files {
+        path.join(imgui_location, "**.h"),
+        path.join(imgui_location, "**.cpp")
+    }
+    includedirs {
+        imgui_location,
+        "gl3w/include", -- TODO: this should be in extern as well
+        path.join(sdl_dir, "include") }
+
+    -- TODO: this should be deleted in favor of local SDL
+    filter "system:linux"
+        -- NOTE: This is to support inclusion via #include <SDL.h>.
+        -- Otherwise we would have to do <SDL2/SDL.h> which would not
+        -- be compatible with the macOS framework
+        includedirs { "/usr/include/SDL2" }
+end
+
 function imnodes_example_project(name, example_file)
     project(name)
     location(project_location)
@@ -5,20 +34,42 @@ function imnodes_example_project(name, example_file)
     language "C++"
     targetdir "bin/%{cfg.buildcfg}"
     files {"example/main.cpp", path.join("example", example_file) }
-    includedirs { ".", "imgui", "gl3w/include" }
-    links { "gl3w", "imgui", "imnodes" }
+    includedirs {
+        ".",
+        "imgui",
+        "gl3w/include",
+        path.join(sdl_dir, "include")
+    }
+    links { "gl3w", "imgui", "imnodes", "SDL2" }
     filter { "action:gmake" }
         buildoptions { "-std=c++11" }
+
     filter "system:macosx"
-        includedirs { "/Library/Frameworks/SDL2.framework/Headers" }
-        linkoptions { "-F/Library/Frameworks -framework SDL2 -framework CoreFoundation" }
+        -- On MacOS, it's very easy to end up with multiple iconvs, if using
+        -- some kind of package manager which exports it's own location.
+        -- Linking against /usr/lib mitigates against linking errors caused by this.
+        libdirs { path.join(sdl_dir, "bin"), "/usr/lib" }
+        links {
+            "iconv",
+            "AudioToolbox.framework",
+            "Carbon.framework",
+            "Cocoa.framework",
+            "CoreAudio.framework",
+            "CoreVideo.framework",
+            "ForceFeedback.framework",
+            "IOKit.framework"
+        }
+
     filter "system:linux"
         includedirs { "/usr/include/SDL2" }
-        links { "SDL2", "dl" }
+        links { "dl" }
+
+    filter "system:windows"
+        defines { "SDL_MAIN_HANDLED" }
 end
 
 workspace "imnodes"
-    local project_location = ""
+    project_location = ""
     if _ACTION then
         project_location = "build/" .. _ACTION
     end
@@ -56,9 +107,12 @@ workspace "imnodes"
         cppdialect "C++98"
         targetdir "lib/%{cfg.buildcfg}"
         files { "imgui/**.h", "imgui/**.cpp" }
-        includedirs { "imgui", "gl3w/include" }
-        filter "system:macosx"
-            includedirs { "/Library/Frameworks/SDL2.framework/Headers" }
+        includedirs {
+            "imgui",
+            "gl3w/include",
+            path.join(sdl_dir, "include") }
+
+        -- TODO: this should be deleted in favor of local SDL
         filter "system:linux"
             -- NOTE: This is to support inclusion via #include <SDL.h>.
             -- Otherwise we would have to do <SDL2/SDL.h> which would not

@@ -2,19 +2,26 @@ name: Build
 on: [push]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    container:
-      image: docker://nelarius/imnodes-docker-builder:latest
+  macos:
+    runs-on: macos-10.15
     steps:
       # This step uses checkout action: https://github.com/actions/checkout
       - name: Checkout
         uses: actions/checkout@v2
-        id: checkout
-      # This step prints an output (time) from the previous step's action.
-      - name: premake5
-        run: premake5 gmake
-      - name: make-debug
+      - name: Premake
+        run: ./extern/premake5/macos/premake5 gmake
+        working-directory: .
+      - name: Build debug
         run: make all config=debug -j
-      - name: make-release
+        working-directory: .
+      - name: Build release
         run: make all config=release -j
+        working-directory: .
+  windows:
+    runs-on: windows-2019
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Premake
+        run: extern/premake5/windows/premake5.exe vs2019
+        working-directory: .
